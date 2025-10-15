@@ -243,7 +243,7 @@
             <div class="typing-indicator" id="typingIndicator"></div>
             
             <div class="input-area">
-                <input type="password" class="message-input" id="messageInput" placeholder="Nhập tin nhắn của bạn...">
+                <input type="text" class="message-input" id="messageInput" placeholder="Nhập tin nhắn của bạn...">
                 <button class="btn-send" id="sendBtn">Gửi</button>
             </div>
         </div>
@@ -274,6 +274,7 @@
         let users = new Set();
         let typingUsers = {};
         let typingTimeout = null;
+        let lastMessageCount = 0;
 
         // API để các tab giao tiếp với nhau
         const broadcastChannel = new BroadcastChannel('chat_app');
@@ -321,43 +322,55 @@
             }
         }
 
-        // Hàm hiển thị tin nhắn
+        // Hàm hiển thị tin nhắn (chỉ render khi cần thiết)
         function renderMessages() {
+            // Chỉ render lại nếu số lượng tin nhắn thay đổi
+            if (messages.length === lastMessageCount) {
+                return;
+            }
+            
             messagesContainer.innerHTML = '';
             
             messages.forEach(msg => {
-                const messageElement = document.createElement('div');
-                messageElement.className = `message ${msg.sender === currentUser ? 'sent' : 'received'}`;
-                
-                const encryptedMessage = document.createElement('div');
-                encryptedMessage.className = 'encrypted';
-                encryptedMessage.textContent = msg.encrypted;
-                encryptedMessage.setAttribute('data-original', msg.content);
-                
-                // Thêm sự kiện hover để hiển thị tin nhắn gốc
-                encryptedMessage.addEventListener('mouseenter', function() {
-                    this.textContent = this.getAttribute('data-original');
-                });
-                
-                encryptedMessage.addEventListener('mouseleave', function() {
-                    this.textContent = msg.encrypted;
-                });
-                
-                const messageInfo = document.createElement('div');
-                messageInfo.className = 'message-info';
-                messageInfo.textContent = `${msg.sender} • ${msg.time}`;
-                
-                messageElement.appendChild(encryptedMessage);
-                messageElement.appendChild(messageInfo);
-                
-                messagesContainer.appendChild(messageElement);
+                addMessageElement(msg);
             });
+            
+            lastMessageCount = messages.length;
             
             // Cuộn xuống dưới cùng
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
-        // Hàm thêm tin nhắn mới
+        // Hàm thêm một tin nhắn vào DOM
+        function addMessageElement(msg) {
+            const messageElement = document.createElement('div');
+            messageElement.className = `message ${msg.sender === currentUser ? 'sent' : 'received'}`;
+            
+            const encryptedMessage = document.createElement('div');
+            encryptedMessage.className = 'encrypted';
+            encryptedMessage.textContent = msg.encrypted;
+            encryptedMessage.setAttribute('data-original', msg.content);
+            
+            // Thêm sự kiện hover để hiển thị tin nhắn gốc
+            encryptedMessage.addEventListener('mouseenter', function() {
+                this.textContent = this.getAttribute('data-original');
+            });
+            
+            encryptedMessage.addEventListener('mouseleave', function() {
+                this.textContent = msg.encrypted;
+            });
+            
+            const messageInfo = document.createElement('div');
+            messageInfo.className = 'message-info';
+            messageInfo.textContent = `${msg.sender} • ${msg.time}`;
+            
+            messageElement.appendChild(encryptedMessage);
+            messageElement.appendChild(messageInfo);
+            
+            messagesContainer.appendChild(messageElement);
+        }
+
+        // Hàm thêm tin nhắn mới (chỉ thêm vào DOM, không render lại toàn bộ)
         function addMessage(content, sender, isEncrypted = true, fromOtherTab = false) {
             const now = new Date();
             const timeString = now.getHours().toString().padStart(2, '0') + ':' + 
@@ -375,7 +388,13 @@
             };
             
             messages.push(message);
-            renderMessages();
+            
+            // Chỉ thêm tin nhắn mới vào DOM, không render lại toàn bộ
+            addMessageElement(message);
+            lastMessageCount = messages.length;
+            
+            // Cuộn xuống dưới cùng
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
             
             // Chỉ lưu và broadcast nếu không phải từ tab khác
             if (!fromOtherTab) {
@@ -440,9 +459,7 @@
             
             switch (data.type) {
                 case 'MESSAGES_UPDATED':
-                    if (data.tabId !== currentTabId) {
-                        loadMessages();
-                    }
+                    // Không cần làm gì vì chúng ta chỉ thêm tin nhắn mới
                     break;
                     
                 case 'NEW_MESSAGE':
@@ -458,7 +475,7 @@
                         
                         // Tự động xóa sau 2 giây
                         setTimeout(() => {
-                            if (typingUsers[data.user] === Date.now() - 2000) {
+                            if (typingUsers[data.user] < Date.now() - 2000) {
                                 delete typingUsers[data.user];
                                 updateTypingIndicator();
                             }
@@ -470,7 +487,7 @@
                     if (data.tabId !== currentTabId) {
                         users.add(data.user);
                         updateOnlineUsers();
-                        addMessage(`${data.user} đã tham gia phòng chat từ tab khác`, "Hệ thống", false, true);
+                        addMessage(`${data.user} đã tham gia phòng chat`, "Hệ thống", false, true);
                     }
                     break;
                     
