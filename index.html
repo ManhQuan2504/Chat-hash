@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat Room Real-time</title>
+    <title>Chat Room Real-time Multi-Tab</title>
     <style>
         * {
             margin: 0;
@@ -122,6 +122,12 @@
             padding: 10px 15px;
             border-radius: 10px;
             max-width: 80%;
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         
         .received {
@@ -171,13 +177,22 @@
             border-bottom: 1px solid #ddd;
             font-size: 0.8rem;
         }
+        
+        .tab-indicator {
+            background: #4CAF50;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.7rem;
+            margin-left: 10px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>Chat Room Real-time</h1>
-            <p>Kết nối và trò chuyện với mọi người</p>
+            <h1>Chat Room Multi-Tab</h1>
+            <p>Các tab có thể liên kết với nhau</p>
         </div>
         
         <div class="form-container" id="loginForm">
@@ -191,7 +206,7 @@
             </div>
             <button id="loginBtn">Vào Phòng Chat</button>
             <p style="text-align: center; margin-top: 15px; color: #666;">
-                Mật khẩu mặc định: <strong>zxc</strong>
+                Mật khẩu: <strong>zxc</strong> • Mở nhiều tab để test
             </p>
         </div>
         
@@ -201,7 +216,10 @@
                     <div class="avatar" id="userAvatar">U</div>
                     <div>
                         <div id="userDisplayName">Người dùng</div>
-                        <div style="font-size: 0.8rem;">Đang trực tuyến</div>
+                        <div style="font-size: 0.8rem;">
+                            <span id="onlineCount">0 người online</span>
+                            <span class="tab-indicator" id="tabIndicator">Tab 1</span>
+                        </div>
                     </div>
                 </div>
                 <button class="logout-btn" id="logoutBtn">Thoát</button>
@@ -213,7 +231,7 @@
             
             <div class="messages" id="messagesContainer">
                 <div class="message received">
-                    <div>Chào mừng bạn đến với phòng chat!</div>
+                    <div>Chào mừng đến với phòng chat multi-tab!</div>
                     <div class="message-info">Hệ thống • Vừa xong</div>
                 </div>
             </div>
@@ -242,13 +260,20 @@
         const messagesContainer = document.getElementById('messagesContainer');
         const typingIndicator = document.getElementById('typingIndicator');
         const onlineUsers = document.getElementById('onlineUsers');
+        const onlineCount = document.getElementById('onlineCount');
+        const tabIndicator = document.getElementById('tabIndicator');
 
         // Biến toàn cục
         let currentUser = null;
+        let currentTabId = Math.random().toString(36).substr(2, 9);
         let messages = [];
-        let users = [];
+        let users = new Set();
         let typingUsers = {};
         let typingTimeout = null;
+
+        // API để các tab giao tiếp với nhau
+        const broadcastChannel = new BroadcastChannel('chat_app');
+        const storageKey = 'multi_tab_chat_data';
 
         // Mật khẩu mặc định
         const defaultPassword = 'zxc';
@@ -266,16 +291,28 @@
             return encrypted;
         }
 
-        // Hàm lưu tin nhắn vào localStorage
+        // Hàm lưu tin nhắn vào localStorage và thông báo cho các tab khác
         function saveMessages() {
-            localStorage.setItem('chatMessages', JSON.stringify(messages));
+            const chatData = {
+                messages: messages,
+                lastUpdate: Date.now(),
+                tabId: currentTabId
+            };
+            localStorage.setItem(storageKey, JSON.stringify(chatData));
+            
+            // Thông báo cho các tab khác
+            broadcastChannel.postMessage({
+                type: 'MESSAGES_UPDATED',
+                tabId: currentTabId
+            });
         }
 
         // Hàm tải tin nhắn từ localStorage
         function loadMessages() {
-            const savedMessages = localStorage.getItem('chatMessages');
-            if (savedMessages) {
-                messages = JSON.parse(savedMessages);
+            const savedData = localStorage.getItem(storageKey);
+            if (savedData) {
+                const chatData = JSON.parse(savedData);
+                messages = chatData.messages || [];
                 renderMessages();
             }
         }
@@ -317,7 +354,7 @@
         }
 
         // Hàm thêm tin nhắn mới
-        function addMessage(content, sender, isEncrypted = true) {
+        function addMessage(content, sender, isEncrypted = true, fromOtherTab = false) {
             const now = new Date();
             const timeString = now.getHours().toString().padStart(2, '0') + ':' + 
                               now.getMinutes().toString().padStart(2, '0');
@@ -329,31 +366,25 @@
                 encrypted,
                 sender,
                 time: timeString,
-                timestamp: now.getTime()
+                timestamp: now.getTime(),
+                tabId: currentTabId
             };
             
             messages.push(message);
             renderMessages();
-            saveMessages();
+            
+            // Chỉ lưu và broadcast nếu không phải từ tab khác
+            if (!fromOtherTab) {
+                saveMessages();
+            }
         }
 
         // Hàm cập nhật danh sách người dùng online
         function updateOnlineUsers() {
-            // Giả lập có 3-5 người dùng online ngẫu nhiên
-            const sampleUsers = ['Minh', 'Lan', 'Hùng', 'An', 'Tú', 'Chi'];
-            const onlineCount = Math.floor(Math.random() * 3) + 3; // 3-5 người
-            const onlineList = [currentUser]; // Luôn có current user
-            
-            // Thêm người dùng ngẫu nhiên
-            for (let i = 0; i < onlineCount; i++) {
-                const randomUser = sampleUsers[Math.floor(Math.random() * sampleUsers.length)];
-                if (!onlineList.includes(randomUser)) {
-                    onlineList.push(randomUser);
-                }
-            }
-            
-            users = onlineList;
-            onlineUsers.textContent = `Đang online: ${users.join(', ')}`;
+            // Lấy danh sách user từ tất cả các tab
+            const allUsers = Array.from(users);
+            onlineUsers.textContent = `Đang online: ${allUsers.join(', ')}`;
+            onlineCount.textContent = `${allUsers.length} người online`;
         }
 
         // Hàm cập nhật trạng thái đang nhập
@@ -373,44 +404,81 @@
             }
         }
 
-        // Hàm giả lập người dùng khác đang nhập
-        function simulateOtherUserTyping() {
-            if (users.length > 1 && Math.random() < 0.3) {
-                const otherUsers = users.filter(user => user !== currentUser);
-                if (otherUsers.length > 0) {
-                    const randomUser = otherUsers[Math.floor(Math.random() * otherUsers.length)];
-                    typingUsers[randomUser] = Date.now();
-                    updateTypingIndicator();
-                    
-                    // Tự động xóa sau 2 giây
-                    setTimeout(() => {
-                        updateTypingIndicator();
-                    }, 2000);
-                }
-            }
+        // Hàm tham gia phòng chat
+        function joinChat() {
+            users.add(currentUser);
+            updateOnlineUsers();
+            
+            // Thông báo cho các tab khác
+            broadcastChannel.postMessage({
+                type: 'USER_JOINED',
+                user: currentUser,
+                tabId: currentTabId
+            });
         }
 
-        // Hàm giả lập nhận tin nhắn từ người dùng khác
-        function simulateOtherUserMessage() {
-            if (users.length > 1 && Math.random() < 0.4) {
-                const otherUsers = users.filter(user => user !== currentUser);
-                if (otherUsers.length > 0) {
-                    const randomUser = otherUsers[Math.floor(Math.random() * otherUsers.length)];
-                    const sampleMessages = [
-                        "Xin chào mọi người!",
-                        "Có ai ở đây không?",
-                        "Tin nhắn này đã được mã hóa!",
-                        "Di chuột vào tin nhắn để xem nội dung thật",
-                        "Ứng dụng chat này thú vị nhỉ!",
-                        "Hôm nay mọi người thế nào?",
-                        "Tôi vừa tham gia phòng chat này"
-                    ];
-                    
-                    const randomMessage = sampleMessages[Math.floor(Math.random() * sampleMessages.length)];
-                    addMessage(randomMessage, randomUser);
-                }
-            }
+        // Hàm rời phòng chat
+        function leaveChat() {
+            users.delete(currentUser);
+            updateOnlineUsers();
+            
+            // Thông báo cho các tab khác
+            broadcastChannel.postMessage({
+                type: 'USER_LEFT',
+                user: currentUser,
+                tabId: currentTabId
+            });
         }
+
+        // Xử lý tin nhắn từ các tab khác
+        broadcastChannel.onmessage = function(event) {
+            const data = event.data;
+            
+            switch (data.type) {
+                case 'MESSAGES_UPDATED':
+                    if (data.tabId !== currentTabId) {
+                        loadMessages();
+                    }
+                    break;
+                    
+                case 'NEW_MESSAGE':
+                    if (data.tabId !== currentTabId) {
+                        addMessage(data.content, data.sender, true, true);
+                    }
+                    break;
+                    
+                case 'USER_TYPING':
+                    if (data.tabId !== currentTabId && data.user !== currentUser) {
+                        typingUsers[data.user] = Date.now();
+                        updateTypingIndicator();
+                        
+                        // Tự động xóa sau 2 giây
+                        setTimeout(() => {
+                            if (typingUsers[data.user] === Date.now() - 2000) {
+                                delete typingUsers[data.user];
+                                updateTypingIndicator();
+                            }
+                        }, 2000);
+                    }
+                    break;
+                    
+                case 'USER_JOINED':
+                    if (data.tabId !== currentTabId) {
+                        users.add(data.user);
+                        updateOnlineUsers();
+                        addMessage(`${data.user} đã tham gia phòng chat từ tab khác`, "Hệ thống", false, true);
+                    }
+                    break;
+                    
+                case 'USER_LEFT':
+                    if (data.tabId !== currentTabId) {
+                        users.delete(data.user);
+                        updateOnlineUsers();
+                        addMessage(`${data.user} đã rời khỏi phòng chat`, "Hệ thống", false, true);
+                    }
+                    break;
+            }
+        };
 
         // Xử lý đăng nhập
         loginBtn.addEventListener('click', function() {
@@ -436,31 +504,27 @@
             // Hiển thị thông tin người dùng
             userDisplayName.textContent = username;
             userAvatar.textContent = username.charAt(0).toUpperCase();
+            tabIndicator.textContent = `Tab ${currentTabId.substr(0, 4)}`;
             
             // Tải tin nhắn
             loadMessages();
             
-            // Cập nhật danh sách người dùng
-            updateOnlineUsers();
+            // Tham gia phòng chat
+            joinChat();
             
             // Thêm tin nhắn chào mừng
             addMessage(`Chào mừng ${username} đã tham gia phòng chat!`, "Hệ thống", false);
-            
-            // Bắt đầu mô phỏng hoạt động của người dùng khác
-            setInterval(updateOnlineUsers, 10000); // Cập nhật mỗi 10s
-            setInterval(simulateOtherUserTyping, 5000); // Mô phỏng typing mỗi 5s
-            setInterval(simulateOtherUserMessage, 8000); // Mô phỏng tin nhắn mỗi 8s
         });
 
         // Xử lý đăng xuất
         logoutBtn.addEventListener('click', function() {
+            // Rời phòng chat
+            leaveChat();
+            
             chatContainer.style.display = 'none';
             loginForm.style.display = 'block';
             usernameInput.value = '';
             passwordInput.value = '';
-            
-            // Thêm thông báo người dùng rời khỏi
-            addMessage(`${currentUser} đã rời khỏi phòng chat.`, "Hệ thống", false);
             
             currentUser = null;
         });
@@ -474,6 +538,14 @@
             }
             
             addMessage(message, currentUser);
+            
+            // Thông báo cho các tab khác
+            broadcastChannel.postMessage({
+                type: 'NEW_MESSAGE',
+                content: message,
+                sender: currentUser,
+                tabId: currentTabId
+            });
             
             // Xóa nội dung ô nhập
             messageInput.value = '';
@@ -498,6 +570,13 @@
             typingUsers[currentUser] = Date.now();
             updateTypingIndicator();
             
+            // Thông báo cho các tab khác
+            broadcastChannel.postMessage({
+                type: 'USER_TYPING',
+                user: currentUser,
+                tabId: currentTabId
+            });
+            
             // Xóa timeout cũ
             if (typingTimeout) {
                 clearTimeout(typingTimeout);
@@ -510,16 +589,19 @@
             }, 2000);
         });
 
-        // Tải tin nhắn mẫu khi trang được tải
+        // Tải dữ liệu ban đầu
         window.addEventListener('load', function() {
-            // Thêm một số tin nhắn mẫu để demo
-            setTimeout(() => {
-                if (messages.length === 0) {
-                    addMessage("Chào mừng đến với phòng chat real-time!", "Hệ thống", false);
-                    addMessage("Tin nhắn sẽ được lưu lại và không bị mất khi refresh trang.", "Hệ thống", false);
-                    addMessage("Mọi người có thể cùng tham gia trò chuyện!", "Hệ thống", false);
-                }
-            }, 500);
+            loadMessages();
+            
+            // Thêm indicator để biết đang ở tab nào
+            tabIndicator.textContent = `Tab ${currentTabId.substr(0, 4)}`;
+        });
+
+        // Xử lý khi tab đóng
+        window.addEventListener('beforeunload', function() {
+            if (currentUser) {
+                leaveChat();
+            }
         });
     </script>
 </body>
