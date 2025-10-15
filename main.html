@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat App - GitHub Pages</title>
+    <title>Ứng Dụng Chat Mã Hóa Nâng Cao</title>
     <style>
         * {
             margin: 0;
@@ -37,6 +37,16 @@
             text-align: center;
         }
         
+        .header h1 {
+            font-size: 1.5rem;
+            margin-bottom: 5px;
+        }
+        
+        .header p {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+        
         .form-container {
             padding: 20px;
         }
@@ -57,6 +67,12 @@
             border: 1px solid #ddd;
             border-radius: 8px;
             font-size: 1rem;
+            transition: border 0.3s;
+        }
+        
+        input:focus, select:focus {
+            outline: none;
+            border-color: #1a2a6c;
         }
         
         button {
@@ -69,6 +85,11 @@
             font-size: 1rem;
             font-weight: 600;
             cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
         }
         
         .chat-container {
@@ -86,6 +107,31 @@
             align-items: center;
         }
         
+        .user-info {
+            display: flex;
+            align-items: center;
+        }
+        
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: #fdbb2d;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        
+        .logout-btn {
+            background: none;
+            border: 1px solid white;
+            width: auto;
+            padding: 8px 15px;
+            font-size: 0.9rem;
+        }
+        
         .messages {
             flex: 1;
             padding: 15px;
@@ -98,22 +144,40 @@
             padding: 10px 15px;
             border-radius: 10px;
             max-width: 80%;
+            position: relative;
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         
         .received {
             background-color: #e9ecef;
+            align-self: flex-start;
+            border-bottom-left-radius: 0;
         }
         
         .sent {
             background: linear-gradient(to right, #1a2a6c, #b21f1f);
             color: white;
+            align-self: flex-end;
             margin-left: auto;
+            border-bottom-right-radius: 0;
+        }
+        
+        .message-info {
+            font-size: 0.7rem;
+            opacity: 0.7;
+            margin-top: 5px;
         }
         
         .input-area {
             display: flex;
             padding: 15px;
             border-top: 1px solid #ddd;
+            background-color: white;
         }
         
         .message-input {
@@ -121,173 +185,601 @@
             margin-right: 10px;
         }
         
+        .send-btn {
+            width: auto;
+            padding: 12px 20px;
+        }
+        
         .encrypted {
             font-family: monospace;
             letter-spacing: 2px;
             cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .encrypted:hover {
+            background-color: rgba(253, 187, 45, 0.2);
+        }
+        
+        .info-text {
+            text-align: center;
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 10px;
+        }
+        
+        .settings-container {
+            display: none;
+            padding: 20px;
+        }
+        
+        .settings-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .back-btn {
+            background: none;
+            border: 1px solid #1a2a6c;
+            color: #1a2a6c;
+            width: auto;
+            padding: 8px 15px;
+        }
+        
+        .settings-options {
+            margin-top: 20px;
+        }
+        
+        .option {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .toggle {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+        
+        .toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background-color: #1a2a6c;
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border-radius: 5px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: all 0.3s;
+        }
+        
+        .notification.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        .typing-indicator {
+            font-style: italic;
+            color: #666;
+            padding: 5px 15px;
+            font-size: 0.9rem;
         }
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- Màn hình đăng nhập -->
         <div class="header">
-            <h1>Chat App - GitHub Pages</h1>
-            <p>Đăng nhập để bắt đầu chat</p>
+            <h1>Ứng Dụng Chat Mã Hóa Nâng Cao</h1>
+            <p>Đăng nhập để bắt đầu trò chuyện</p>
         </div>
         
         <div class="form-container" id="loginForm">
             <div class="form-group">
                 <label for="username">Tên đăng nhập</label>
-                <input type="text" id="username" placeholder="Nhập tên">
+                <input type="text" id="username" placeholder="Nhập tên đăng nhập">
             </div>
             <div class="form-group">
                 <label for="password">Mật khẩu</label>
                 <input type="password" id="password" placeholder="Nhập mật khẩu">
             </div>
+            <div class="form-group">
+                <label for="room">Phòng chat</label>
+                <select id="room">
+                    <option value="general">Phòng chung</option>
+                    <option value="private">Phòng riêng tư</option>
+                    <option value="friends">Phòng bạn bè</option>
+                </select>
+            </div>
             <button id="loginBtn">Đăng Nhập</button>
-            <p style="text-align: center; margin-top: 15px; color: #666;">
-                Mật khẩu mặc định: <strong>123456</strong>
-            </p>
+            <p class="info-text">Gợi ý: Sử dụng tên "admin" và mật khẩu "123456" để đăng nhập</p>
         </div>
         
+        <!-- Giao diện chat -->
         <div class="chat-container" id="chatContainer">
             <div class="chat-header">
-                <div>Chat Room</div>
-                <button id="logoutBtn" style="background: none; border: 1px solid white; padding: 5px 10px;">Đăng Xuất</button>
-            </div>
-            
-            <div class="messages" id="messagesContainer">
-                <div class="message received">
-                    <div>Chào mừng đến với Chat App trên GitHub Pages!</div>
-                    <div style="font-size: 0.7rem; opacity: 0.7; margin-top: 5px;">Hệ thống • Vừa xong</div>
+                <div class="user-info">
+                    <div class="avatar" id="userAvatar">U</div>
+                    <div>
+                        <div id="userDisplayName">Người dùng</div>
+                        <div style="font-size: 0.8rem;" id="roomDisplay">Phòng chung</div>
+                    </div>
+                </div>
+                <div>
+                    <button class="logout-btn" id="settingsBtn">Cài Đặt</button>
+                    <button class="logout-btn" id="logoutBtn" style="margin-left: 10px;">Đăng Xuất</button>
                 </div>
             </div>
             
+            <div class="messages" id="messagesContainer">
+                <!-- Các tin nhắn sẽ được thêm vào đây -->
+                <div class="message received">
+                    <div>Chào mừng bạn đến với ứng dụng chat mã hóa nâng cao!</div>
+                    <div class="message-info">Hệ thống • Vừa xong</div>
+                </div>
+                <div class="message received">
+                    <div>Tin nhắn của bạn sẽ được hiển thị dưới dạng mã hóa. Di chuột vào tin nhắn để xem nội dung thực.</div>
+                    <div class="message-info">Hệ thống • Vừa xong</div>
+                </div>
+            </div>
+            
+            <div class="typing-indicator" id="typingIndicator" style="display: none;"></div>
+            
             <div class="input-area">
-                <input type="text" class="message-input" id="messageInput" placeholder="Nhập tin nhắn...">
-                <button id="sendBtn">Gửi</button>
+                <input type="text" class="message-input" id="messageInput" placeholder="Nhập tin nhắn của bạn...">
+                <button class="send-btn" id="sendBtn">Gửi</button>
+            </div>
+            <p class="info-text">Tin nhắn sẽ được mã hóa khi gửi. Di chuột vào tin nhắn để xem nội dung gốc.</p>
+        </div>
+        
+        <!-- Giao diện cài đặt -->
+        <div class="settings-container" id="settingsContainer">
+            <div class="settings-header">
+                <h2>Cài Đặt</h2>
+                <button class="back-btn" id="backBtn">Quay Lại</button>
+            </div>
+            
+            <div class="form-group">
+                <label for="newPassword">Mật khẩu mới</label>
+                <input type="password" id="newPassword" placeholder="Nhập mật khẩu mới">
+            </div>
+            <div class="form-group">
+                <label for="confirmPassword">Xác nhận mật khẩu</label>
+                <input type="password" id="confirmPassword" placeholder="Nhập lại mật khẩu mới">
+            </div>
+            <button id="changePasswordBtn">Đổi Mật Khẩu</button>
+            
+            <div class="settings-options">
+                <div class="option">
+                    <span>Tự động cập nhật tin nhắn</span>
+                    <label class="toggle">
+                        <input type="checkbox" id="autoUpdateToggle" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="option">
+                    <span>Âm thanh thông báo</span>
+                    <label class="toggle">
+                        <input type="checkbox" id="soundToggle" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="option">
+                    <span>Lưu lịch sử chat</span>
+                    <label class="toggle">
+                        <input type="checkbox" id="saveHistoryToggle" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
             </div>
         </div>
     </div>
+    
+    <div class="notification" id="notification">Thông báo!</div>
 
     <script>
-        // Các phần tử DOM
+        // Lấy các phần tử DOM
         const loginForm = document.getElementById('loginForm');
         const chatContainer = document.getElementById('chatContainer');
+        const settingsContainer = document.getElementById('settingsContainer');
         const loginBtn = document.getElementById('loginBtn');
         const logoutBtn = document.getElementById('logoutBtn');
+        const settingsBtn = document.getElementById('settingsBtn');
+        const backBtn = document.getElementById('backBtn');
+        const usernameInput = document.getElementById('username');
+        const passwordInput = document.getElementById('password');
+        const roomSelect = document.getElementById('room');
+        const userDisplayName = document.getElementById('userDisplayName');
+        const roomDisplay = document.getElementById('roomDisplay');
+        const userAvatar = document.getElementById('userAvatar');
         const messageInput = document.getElementById('messageInput');
         const sendBtn = document.getElementById('sendBtn');
         const messagesContainer = document.getElementById('messagesContainer');
-
+        const typingIndicator = document.getElementById('typingIndicator');
+        const notification = document.getElementById('notification');
+        const newPasswordInput = document.getElementById('newPassword');
+        const confirmPasswordInput = document.getElementById('confirmPassword');
+        const changePasswordBtn = document.getElementById('changePasswordBtn');
+        const autoUpdateToggle = document.getElementById('autoUpdateToggle');
+        const soundToggle = document.getElementById('soundToggle');
+        const saveHistoryToggle = document.getElementById('saveHistoryToggle');
+        
+        // Biến toàn cục
+        let currentUser = null;
+        let currentRoom = 'general';
+        let messages = [];
+        let autoUpdateInterval = null;
+        let isTyping = false;
+        let typingTimeout = null;
+        
+        // Mật khẩu mặc định
+        const defaultPassword = '123456';
+        
+        // Hàm hiển thị thông báo
+        function showNotification(message, type = 'info') {
+            notification.textContent = message;
+            notification.className = 'notification';
+            
+            if (type === 'success') {
+                notification.style.backgroundColor = '#4CAF50';
+            } else if (type === 'error') {
+                notification.style.backgroundColor = '#f44336';
+            } else {
+                notification.style.backgroundColor = '#2196F3';
+            }
+            
+            notification.classList.add('show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+        
         // Hàm mã hóa tin nhắn
         function encryptMessage(message) {
+            // Tạo một chuỗi ngẫu nhiên với độ dài bằng tin nhắn gốc
             let encrypted = '';
             const characters = '!@#$%^&*()_+-=[]{}|;:,.<>?';
+            
             for (let i = 0; i < message.length; i++) {
+                // Thay thế mỗi ký tự bằng một ký tự ngẫu nhiên từ danh sách
                 const randomChar = characters.charAt(Math.floor(Math.random() * characters.length));
                 encrypted += randomChar;
             }
+            
             return encrypted;
         }
-
-        // Xử lý đăng nhập
-        loginBtn.addEventListener('click', function() {
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            
-            if (!username || !password) {
-                alert('Vui lòng nhập đầy đủ thông tin!');
-                return;
+        
+        // Hàm lưu tin nhắn vào localStorage
+        function saveMessages() {
+            if (saveHistoryToggle.checked) {
+                localStorage.setItem(`chatMessages_${currentRoom}`, JSON.stringify(messages));
             }
-            
-            if (password !== '123456') {
-                alert('Mật khẩu không đúng!');
-                return;
+        }
+        
+        // Hàm tải tin nhắn từ localStorage
+        function loadMessages() {
+            const savedMessages = localStorage.getItem(`chatMessages_${currentRoom}`);
+            if (savedMessages) {
+                messages = JSON.parse(savedMessages);
+                renderMessages();
             }
+        }
+        
+        // Hàm hiển thị tin nhắn
+        function renderMessages() {
+            messagesContainer.innerHTML = '';
             
-            loginForm.style.display = 'none';
-            chatContainer.style.display = 'flex';
-            
-            // Thêm tin nhắn chào mừng
-            addMessage(`Chào ${username}! Bạn có thể bắt đầu chat.`, 'Hệ thống', false);
-        });
-
-        // Xử lý đăng xuất
-        logoutBtn.addEventListener('click', function() {
-            chatContainer.style.display = 'none';
-            loginForm.style.display = 'block';
-            document.getElementById('username').value = '';
-            document.getElementById('password').value = '';
-            messagesContainer.innerHTML = '<div class="message received"><div>Chào mừng đến với Chat App trên GitHub Pages!</div><div style="font-size: 0.7rem; opacity: 0.7; margin-top: 5px;">Hệ thống • Vừa xong</div></div>';
-        });
-
-        // Hàm thêm tin nhắn
-        function addMessage(content, sender, isEncrypted = true) {
-            const messageElement = document.createElement('div');
-            messageElement.className = `message ${sender === 'Hệ thống' ? 'received' : 'sent'}`;
-            
-            const messageContent = document.createElement('div');
-            if (isEncrypted) {
-                messageContent.className = 'encrypted';
-                messageContent.textContent = encryptMessage(content);
-                messageContent.setAttribute('data-original', content);
+            messages.forEach(msg => {
+                const messageElement = document.createElement('div');
+                messageElement.className = `message ${msg.sender === currentUser ? 'sent' : 'received'}`;
                 
-                messageContent.addEventListener('mouseenter', function() {
+                const encryptedMessage = document.createElement('div');
+                encryptedMessage.className = 'encrypted';
+                encryptedMessage.textContent = msg.encrypted;
+                encryptedMessage.setAttribute('data-original', msg.content);
+                
+                // Thêm sự kiện hover để hiển thị tin nhắn gốc
+                encryptedMessage.addEventListener('mouseenter', function() {
                     this.textContent = this.getAttribute('data-original');
                 });
                 
-                messageContent.addEventListener('mouseleave', function() {
-                    this.textContent = encryptMessage(this.getAttribute('data-original'));
+                encryptedMessage.addEventListener('mouseleave', function() {
+                    this.textContent = msg.encrypted;
                 });
-            } else {
-                messageContent.textContent = content;
-            }
-            
-            const messageInfo = document.createElement('div');
-            messageInfo.style.fontSize = '0.7rem';
-            messageInfo.style.opacity = '0.7';
-            messageInfo.style.marginTop = '5px';
-            
-            const now = new Date();
-            const time = now.getHours().toString().padStart(2, '0') + ':' + 
-                         now.getMinutes().toString().padStart(2, '0');
-            messageInfo.textContent = `${sender} • ${time}`;
-            
-            messageElement.appendChild(messageContent);
-            messageElement.appendChild(messageInfo);
-            messagesContainer.appendChild(messageElement);
+                
+                const messageInfo = document.createElement('div');
+                messageInfo.className = 'message-info';
+                messageInfo.textContent = `${msg.sender} • ${msg.time}`;
+                
+                messageElement.appendChild(encryptedMessage);
+                messageElement.appendChild(messageInfo);
+                
+                messagesContainer.appendChild(messageElement);
+            });
             
             // Cuộn xuống dưới cùng
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
-
-        // Xử lý gửi tin nhắn
-        sendBtn.addEventListener('click', function() {
-            const message = messageInput.value.trim();
-            if (message) {
-                addMessage(message, 'Bạn');
-                messageInput.value = '';
-                
-                // Giả lập phản hồi sau 1 giây
-                setTimeout(() => {
-                    const responses = [
-                        "Xin chào! Tin nhắn của bạn đã được mã hóa",
-                        "Tôi có thể đọc tin nhắn của bạn khi di chuột vào",
-                        "Ứng dụng này đang chạy trên GitHub Pages!",
-                        "Tin nhắn của bạn: " + message
-                    ];
-                    const randomResponse = responses[Math.floor(Math.random() * responses.length)];
-                    addMessage(randomResponse, 'Người khác');
-                }, 1000);
+        
+        // Hàm thêm tin nhắn mới
+        function addMessage(content, sender, isEncrypted = true) {
+            const now = new Date();
+            const timeString = now.getHours().toString().padStart(2, '0') + ':' + 
+                              now.getMinutes().toString().padStart(2, '0');
+            
+            const encrypted = isEncrypted ? encryptMessage(content) : content;
+            
+            const message = {
+                content,
+                encrypted,
+                sender,
+                time: timeString,
+                timestamp: now.getTime()
+            };
+            
+            messages.push(message);
+            renderMessages();
+            saveMessages();
+            
+            // Phát âm thanh thông báo nếu được bật
+            if (soundToggle.checked && sender !== currentUser) {
+                playNotificationSound();
             }
+        }
+        
+        // Hàm phát âm thanh thông báo
+        function playNotificationSound() {
+            const audio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==');
+            audio.play().catch(e => console.log('Không thể phát âm thanh: ', e));
+        }
+        
+        // Hàm mô phỏng nhận tin nhắn từ người dùng khác
+        function simulateOtherUserMessage() {
+            const sampleMessages = [
+                "Xin chào! Đây là tin nhắn mã hóa.",
+                "Bạn có thể di chuột vào tin nhắn để xem nội dung gốc.",
+                "Ứng dụng này rất thú vị phải không?",
+                "Tính năng tự động cập nhật thật tiện lợi!",
+                "Bạn đã thử đổi mật khẩu chưa?"
+            ];
+            
+            const randomMessage = sampleMessages[Math.floor(Math.random() * sampleMessages.length)];
+            addMessage(randomMessage, 'Người dùng khác');
+            
+            // Hiển thị thông báo
+            showNotification('Có tin nhắn mới từ Người dùng khác', 'info');
+        }
+        
+        // Hàm bắt đầu tự động cập nhật tin nhắn
+        function startAutoUpdate() {
+            if (autoUpdateToggle.checked) {
+                autoUpdateInterval = setInterval(() => {
+                    // 30% cơ hội nhận được tin nhắn mới
+                    if (Math.random() < 0.3) {
+                        simulateOtherUserMessage();
+                    }
+                }, 5000);
+            }
+        }
+        
+        // Hàm dừng tự động cập nhật tin nhắn
+        function stopAutoUpdate() {
+            if (autoUpdateInterval) {
+                clearInterval(autoUpdateInterval);
+                autoUpdateInterval = null;
+            }
+        }
+        
+        // Hàm xử lý đăng nhập
+        loginBtn.addEventListener('click', function() {
+            const username = usernameInput.value.trim();
+            const password = passwordInput.value.trim();
+            const room = roomSelect.value;
+            
+            if (username === '' || password === '') {
+                showNotification('Vui lòng nhập tên đăng nhập và mật khẩu!', 'error');
+                return;
+            }
+            
+            // Kiểm tra mật khẩu (trong thực tế, bạn sẽ kiểm tra với server)
+            if (password !== defaultPassword && password !== localStorage.getItem(`userPassword_${username}`)) {
+                showNotification('Mật khẩu không chính xác!', 'error');
+                return;
+            }
+            
+            currentUser = username;
+            currentRoom = room;
+            
+            // Ẩn form đăng nhập, hiện giao diện chat
+            loginForm.style.display = 'none';
+            chatContainer.style.display = 'flex';
+            
+            // Hiển thị thông tin người dùng
+            userDisplayName.textContent = username;
+            roomDisplay.textContent = `Phòng ${room}`;
+            userAvatar.textContent = username.charAt(0).toUpperCase();
+            
+            // Tải tin nhắn
+            loadMessages();
+            
+            // Bắt đầu tự động cập nhật
+            startAutoUpdate();
+            
+            showNotification(`Đăng nhập thành công! Chào mừng đến phòng ${room}`, 'success');
         });
-
-        // Gửi tin nhắn bằng Enter
+        
+        // Hàm xử lý đăng xuất
+        logoutBtn.addEventListener('click', function() {
+            // Dừng tự động cập nhật
+            stopAutoUpdate();
+            
+            // Hiện form đăng nhập, ẩn giao diện chat
+            loginForm.style.display = 'block';
+            chatContainer.style.display = 'none';
+            
+            // Xóa thông tin đăng nhập
+            usernameInput.value = '';
+            passwordInput.value = '';
+            
+            // Đặt lại biến
+            currentUser = null;
+            messages = [];
+            
+            showNotification('Đã đăng xuất thành công!', 'info');
+        });
+        
+        // Hàm xử lý mở cài đặt
+        settingsBtn.addEventListener('click', function() {
+            chatContainer.style.display = 'none';
+            settingsContainer.style.display = 'block';
+        });
+        
+        // Hàm xử lý quay lại từ cài đặt
+        backBtn.addEventListener('click', function() {
+            settingsContainer.style.display = 'none';
+            chatContainer.style.display = 'flex';
+        });
+        
+        // Hàm xử lý đổi mật khẩu
+        changePasswordBtn.addEventListener('click', function() {
+            const newPassword = newPasswordInput.value.trim();
+            const confirmPassword = confirmPasswordInput.value.trim();
+            
+            if (newPassword === '' || confirmPassword === '') {
+                showNotification('Vui lòng nhập đầy đủ thông tin!', 'error');
+                return;
+            }
+            
+            if (newPassword !== confirmPassword) {
+                showNotification('Mật khẩu xác nhận không khớp!', 'error');
+                return;
+            }
+            
+            if (newPassword.length < 6) {
+                showNotification('Mật khẩu phải có ít nhất 6 ký tự!', 'error');
+                return;
+            }
+            
+            // Lưu mật khẩu mới (trong thực tế, bạn sẽ gửi đến server)
+            localStorage.setItem(`userPassword_${currentUser}`, newPassword);
+            
+            newPasswordInput.value = '';
+            confirmPasswordInput.value = '';
+            
+            showNotification('Đổi mật khẩu thành công!', 'success');
+        });
+        
+        // Hàm gửi tin nhắn
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            
+            if (message === '') {
+                return;
+            }
+            
+            addMessage(message, currentUser);
+            
+            // Xóa nội dung ô nhập
+            messageInput.value = '';
+            
+            // Ẩn trạng thái đang nhập
+            isTyping = false;
+            typingIndicator.style.display = 'none';
+        }
+        
+        // Xử lý sự kiện gửi tin nhắn
+        sendBtn.addEventListener('click', sendMessage);
+        
         messageInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
-                sendBtn.click();
+                sendMessage();
             }
+        });
+        
+        // Xử lý sự kiện nhập tin nhắn (hiển thị "đang nhập...")
+        messageInput.addEventListener('input', function() {
+            if (!isTyping) {
+                isTyping = true;
+                typingIndicator.textContent = `${currentUser} đang nhập...`;
+                typingIndicator.style.display = 'block';
+            }
+            
+            // Xóa timeout cũ
+            if (typingTimeout) {
+                clearTimeout(typingTimeout);
+            }
+            
+            // Đặt timeout mới
+            typingTimeout = setTimeout(() => {
+                isTyping = false;
+                typingIndicator.style.display = 'none';
+            }, 1000);
+        });
+        
+        // Xử lý thay đổi cài đặt tự động cập nhật
+        autoUpdateToggle.addEventListener('change', function() {
+            if (this.checked) {
+                startAutoUpdate();
+            } else {
+                stopAutoUpdate();
+            }
+        });
+        
+        // Thêm một số tin nhắn mẫu khi tải trang
+        window.addEventListener('load', function() {
+            // Thêm tin nhắn mẫu
+            setTimeout(() => {
+                addMessage("Đây là ứng dụng chat mã hóa nâng cao!", "Hệ thống", false);
+                addMessage("Tin nhắn được lưu tự động và cập nhật trong thời gian thực!", "Hệ thống", false);
+            }, 1000);
         });
     </script>
 </body>
