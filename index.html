@@ -166,7 +166,6 @@
             letter-spacing: 1px;
             cursor: pointer;
             font-size: 0.9rem;
-            word-break: break-all;
             background: rgba(0, 0, 0, 0.05);
             padding: 4px 8px;
             border-radius: 4px;
@@ -192,21 +191,6 @@
             font-size: 0.8rem;
         }
         
-        .tab-indicator {
-            background: #4CAF50;
-            color: white;
-            padding: 5px 10px;
-            border-radius: 5px;
-            font-size: 0.7rem;
-            margin-left: 10px;
-        }
-
-        .hash-prefix {
-            color: #666;
-            font-size: 0.8rem;
-            margin-right: 5px;
-        }
-
         .connection-status {
             font-size: 0.7rem;
             margin-top: 5px;
@@ -228,7 +212,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>Chat Room Multi-User</h1>
+            <h1>Tôi yêu... à mà thôi</h1>
             <p>Kết nối bạn bè từ mọi nơi</p>
         </div>
         
@@ -255,7 +239,7 @@
                         <div id="userDisplayName">Người dùng</div>
                         <div style="font-size: 0.8rem;">
                             <span id="onlineCount">0 người online</span>
-                            <span class="tab-indicator" id="roomDisplay">Phòng: ...</span>
+                            <span id="roomDisplay">Phòng: ...</span>
                         </div>
                         <div class="connection-status" id="connectionStatus">
                             <span class="connected">● Đang kết nối</span>
@@ -315,31 +299,26 @@
 
         // Firebase configuration - THAY THẾ BẰNG CẤU HÌNH CỦA BẠN
         const firebaseConfig = {
-          apiKey: "AIzaSyCzp95LR6V-UOgkKAURP4sKfQAkcR-Wh1k",
-          authDomain: "chat-hash.firebaseapp.com",
-          databaseURL: "https://chat-hash-default-rtdb.asia-southeast1.firebasedatabase.app",
-          projectId: "chat-hash",
-          storageBucket: "chat-hash.firebasestorage.app",
-          messagingSenderId: "168566865519",
-          appId: "1:168566865519:web:fe954985d8b4b2d532579a",
-          measurementId: "G-XVKJXRVSDJ"
+            apiKey: "AIzaSyYOUR_API_KEY_HERE",
+            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+            databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT_ID.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
         };
 
-        // Hàm mã hóa tin nhắn
+        // Hàm mã hóa tin nhắn - thay thế mỗi ký tự bằng ký tự ngẫu nhiên
         function encryptMessage(message) {
-            let hash = 0;
+            let encrypted = '';
+            const characters = '!@#$%^&*()_+-=[]{}|;:,.<>?~`';
+            
             for (let i = 0; i < message.length; i++) {
-                const char = message.charCodeAt(i);
-                hash = ((hash << 5) - hash) + char;
-                hash = hash & hash;
+                const randomChar = characters.charAt(Math.floor(Math.random() * characters.length));
+                encrypted += randomChar;
             }
             
-            let hashStr = Math.abs(hash).toString(16);
-            while (hashStr.length < 64) {
-                hashStr = '0' + hashStr;
-            }
-            
-            return `sha256:${hashStr}`;
+            return encrypted;
         }
 
         // Hàm thêm tin nhắn vào DOM
@@ -350,31 +329,24 @@
             const messageContent = document.createElement('div');
             
             if (msg.sender === 'Hệ thống') {
+                // Tin nhắn hệ thống hiển thị bình thường
                 messageContent.textContent = msg.content;
             } else {
+                // Tin nhắn người dùng hiển thị dạng mã hóa
                 const encryptedContainer = document.createElement('div');
                 encryptedContainer.className = 'encrypted';
+                encryptedContainer.textContent = msg.encrypted;
+                encryptedContainer.setAttribute('data-original', msg.content);
                 
-                const hashPrefix = document.createElement('span');
-                hashPrefix.className = 'hash-prefix';
-                hashPrefix.textContent = '🔒 Hash:';
-                
-                const hashValue = document.createElement('span');
-                hashValue.textContent = msg.encrypted;
-                hashValue.setAttribute('data-original', msg.content);
-                
+                // Thêm sự kiện hover để hiển thị tin nhắn gốc
                 encryptedContainer.addEventListener('mouseenter', function() {
-                    hashPrefix.textContent = '🔓 Text:';
-                    hashValue.textContent = this.querySelector('span:last-child').getAttribute('data-original');
+                    this.textContent = this.getAttribute('data-original');
                 });
                 
                 encryptedContainer.addEventListener('mouseleave', function() {
-                    hashPrefix.textContent = '🔒 Hash:';
-                    hashValue.textContent = msg.encrypted;
+                    this.textContent = msg.encrypted;
                 });
                 
-                encryptedContainer.appendChild(hashPrefix);
-                encryptedContainer.appendChild(hashValue);
                 messageContent.appendChild(encryptedContainer);
             }
             
