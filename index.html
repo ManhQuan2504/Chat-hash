@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat Room Real-time Multi-Tab</title>
+    <title>Chat Room Multi-User Real-time</title>
     <style>
         * {
             margin: 0;
@@ -162,9 +162,19 @@
         }
         
         .encrypted {
-            font-family: monospace;
-            letter-spacing: 2px;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 1px;
             cursor: pointer;
+            font-size: 0.9rem;
+            word-break: break-all;
+            background: rgba(0, 0, 0, 0.05);
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+        
+        .encrypted:hover {
+            background: rgba(253, 187, 45, 0.2);
         }
         
         .typing-indicator {
@@ -190,13 +200,36 @@
             font-size: 0.7rem;
             margin-left: 10px;
         }
+
+        .hash-prefix {
+            color: #666;
+            font-size: 0.8rem;
+            margin-right: 5px;
+        }
+
+        .connection-status {
+            font-size: 0.7rem;
+            margin-top: 5px;
+        }
+
+        .connected {
+            color: #4CAF50;
+        }
+
+        .disconnected {
+            color: #f44336;
+        }
     </style>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>Chat Room Multi-Tab</h1>
-            <p>Các tab có thể liên kết với nhau</p>
+            <h1>Chat Room Multi-User</h1>
+            <p>Kết nối bạn bè từ mọi nơi</p>
         </div>
         
         <div class="form-container" id="loginForm">
@@ -205,12 +238,12 @@
                 <input type="text" id="username" placeholder="Nhập tên hiển thị">
             </div>
             <div class="form-group">
-                <label for="password">Mật khẩu phòng</label>
-                <input type="password" id="password" placeholder="Mật khẩu: zxc">
+                <label for="roomId">ID Phòng chat</label>
+                <input type="text" id="roomId" placeholder="Nhập ID phòng (ví dụ: room1)">
             </div>
             <button id="loginBtn">Vào Phòng Chat</button>
             <p style="text-align: center; margin-top: 15px; color: #666;">
-                Mật khẩu: <strong>zxc</strong> • Mở nhiều tab để test
+                Cùng ID phòng = Cùng phòng chat • Chia sẻ ID phòng cho bạn bè
             </p>
         </div>
         
@@ -222,7 +255,10 @@
                         <div id="userDisplayName">Người dùng</div>
                         <div style="font-size: 0.8rem;">
                             <span id="onlineCount">0 người online</span>
-                            <span class="tab-indicator" id="tabIndicator">Tab 1</span>
+                            <span class="tab-indicator" id="roomDisplay">Phòng: ...</span>
+                        </div>
+                        <div class="connection-status" id="connectionStatus">
+                            <span class="connected">● Đang kết nối</span>
                         </div>
                     </div>
                 </div>
@@ -235,7 +271,7 @@
             
             <div class="messages" id="messagesContainer">
                 <div class="message received">
-                    <div>Chào mừng đến với phòng chat multi-tab!</div>
+                    <div>Chào mừng đến với phòng chat đa người dùng!</div>
                     <div class="message-info">Hệ thống • Vừa xong</div>
                 </div>
             </div>
@@ -256,164 +292,116 @@
         const loginBtn = document.getElementById('loginBtn');
         const logoutBtn = document.getElementById('logoutBtn');
         const usernameInput = document.getElementById('username');
-        const passwordInput = document.getElementById('password');
+        const roomIdInput = document.getElementById('roomId');
         const userDisplayName = document.getElementById('userDisplayName');
         const userAvatar = document.getElementById('userAvatar');
+        const roomDisplay = document.getElementById('roomDisplay');
         const messageInput = document.getElementById('messageInput');
         const sendBtn = document.getElementById('sendBtn');
         const messagesContainer = document.getElementById('messagesContainer');
         const typingIndicator = document.getElementById('typingIndicator');
         const onlineUsers = document.getElementById('onlineUsers');
         const onlineCount = document.getElementById('onlineCount');
-        const tabIndicator = document.getElementById('tabIndicator');
+        const connectionStatus = document.getElementById('connectionStatus');
 
         // Biến toàn cục
         let currentUser = null;
-        let currentTabId = Math.random().toString(36).substr(2, 9);
-        let messages = [];
-        let users = new Set();
-        let typingUsers = {};
-        let typingTimeout = null;
-        let lastMessageCount = 0;
+        let currentRoom = null;
+        let database = null;
+        let messagesRef = null;
+        let usersRef = null;
+        let typingRef = null;
+        let userRef = null;
 
-        // API để các tab giao tiếp với nhau
-        const broadcastChannel = new BroadcastChannel('chat_app');
-        const storageKey = 'multi_tab_chat_data';
-
-        // Mật khẩu mặc định
-        const defaultPassword = 'zxc';
+        // Firebase configuration - THAY THẾ BẰNG CẤU HÌNH CỦA BẠN
+        const firebaseConfig = {
+          apiKey: "AIzaSyCzp95LR6V-UOgkKAURP4sKfQAkcR-Wh1k",
+          authDomain: "chat-hash.firebaseapp.com",
+          databaseURL: "https://chat-hash-default-rtdb.asia-southeast1.firebasedatabase.app",
+          projectId: "chat-hash",
+          storageBucket: "chat-hash.firebasestorage.app",
+          messagingSenderId: "168566865519",
+          appId: "1:168566865519:web:fe954985d8b4b2d532579a",
+          measurementId: "G-XVKJXRVSDJ"
+        };
 
         // Hàm mã hóa tin nhắn
         function encryptMessage(message) {
-            let encrypted = '';
-            const characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?';
-            
+            let hash = 0;
             for (let i = 0; i < message.length; i++) {
-                const randomChar = characters.charAt(Math.floor(Math.random() * characters.length));
-                encrypted += randomChar;
+                const char = message.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash;
             }
             
-            return encrypted;
-        }
-
-        // Hàm lưu tin nhắn vào localStorage và thông báo cho các tab khác
-        function saveMessages() {
-            const chatData = {
-                messages: messages,
-                lastUpdate: Date.now(),
-                tabId: currentTabId
-            };
-            localStorage.setItem(storageKey, JSON.stringify(chatData));
-            
-            // Thông báo cho các tab khác
-            broadcastChannel.postMessage({
-                type: 'MESSAGES_UPDATED',
-                tabId: currentTabId
-            });
-        }
-
-        // Hàm tải tin nhắn từ localStorage
-        function loadMessages() {
-            const savedData = localStorage.getItem(storageKey);
-            if (savedData) {
-                const chatData = JSON.parse(savedData);
-                messages = chatData.messages || [];
-                renderMessages();
-            }
-        }
-
-        // Hàm hiển thị tin nhắn (chỉ render khi cần thiết)
-        function renderMessages() {
-            // Chỉ render lại nếu số lượng tin nhắn thay đổi
-            if (messages.length === lastMessageCount) {
-                return;
+            let hashStr = Math.abs(hash).toString(16);
+            while (hashStr.length < 64) {
+                hashStr = '0' + hashStr;
             }
             
-            messagesContainer.innerHTML = '';
-            
-            messages.forEach(msg => {
-                addMessageElement(msg);
-            });
-            
-            lastMessageCount = messages.length;
-            
-            // Cuộn xuống dưới cùng
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            return `sha256:${hashStr}`;
         }
 
-        // Hàm thêm một tin nhắn vào DOM
+        // Hàm thêm tin nhắn vào DOM
         function addMessageElement(msg) {
             const messageElement = document.createElement('div');
             messageElement.className = `message ${msg.sender === currentUser ? 'sent' : 'received'}`;
             
-            const encryptedMessage = document.createElement('div');
-            encryptedMessage.className = 'encrypted';
-            encryptedMessage.textContent = msg.encrypted;
-            encryptedMessage.setAttribute('data-original', msg.content);
+            const messageContent = document.createElement('div');
             
-            // Thêm sự kiện hover để hiển thị tin nhắn gốc
-            encryptedMessage.addEventListener('mouseenter', function() {
-                this.textContent = this.getAttribute('data-original');
-            });
-            
-            encryptedMessage.addEventListener('mouseleave', function() {
-                this.textContent = msg.encrypted;
-            });
+            if (msg.sender === 'Hệ thống') {
+                messageContent.textContent = msg.content;
+            } else {
+                const encryptedContainer = document.createElement('div');
+                encryptedContainer.className = 'encrypted';
+                
+                const hashPrefix = document.createElement('span');
+                hashPrefix.className = 'hash-prefix';
+                hashPrefix.textContent = '🔒 Hash:';
+                
+                const hashValue = document.createElement('span');
+                hashValue.textContent = msg.encrypted;
+                hashValue.setAttribute('data-original', msg.content);
+                
+                encryptedContainer.addEventListener('mouseenter', function() {
+                    hashPrefix.textContent = '🔓 Text:';
+                    hashValue.textContent = this.querySelector('span:last-child').getAttribute('data-original');
+                });
+                
+                encryptedContainer.addEventListener('mouseleave', function() {
+                    hashPrefix.textContent = '🔒 Hash:';
+                    hashValue.textContent = msg.encrypted;
+                });
+                
+                encryptedContainer.appendChild(hashPrefix);
+                encryptedContainer.appendChild(hashValue);
+                messageContent.appendChild(encryptedContainer);
+            }
             
             const messageInfo = document.createElement('div');
             messageInfo.className = 'message-info';
             messageInfo.textContent = `${msg.sender} • ${msg.time}`;
             
-            messageElement.appendChild(encryptedMessage);
+            messageElement.appendChild(messageContent);
             messageElement.appendChild(messageInfo);
             
             messagesContainer.appendChild(messageElement);
-        }
-
-        // Hàm thêm tin nhắn mới (chỉ thêm vào DOM, không render lại toàn bộ)
-        function addMessage(content, sender, isEncrypted = true, fromOtherTab = false) {
-            const now = new Date();
-            const timeString = now.getHours().toString().padStart(2, '0') + ':' + 
-                              now.getMinutes().toString().padStart(2, '0');
-            
-            const encrypted = isEncrypted ? encryptMessage(content) : content;
-            
-            const message = {
-                content,
-                encrypted,
-                sender,
-                time: timeString,
-                timestamp: now.getTime(),
-                tabId: currentTabId
-            };
-            
-            messages.push(message);
-            
-            // Chỉ thêm tin nhắn mới vào DOM, không render lại toàn bộ
-            addMessageElement(message);
-            lastMessageCount = messages.length;
-            
-            // Cuộn xuống dưới cùng
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
-            
-            // Chỉ lưu và broadcast nếu không phải từ tab khác
-            if (!fromOtherTab) {
-                saveMessages();
-            }
         }
 
         // Hàm cập nhật danh sách người dùng online
-        function updateOnlineUsers() {
-            // Lấy danh sách user từ tất cả các tab
-            const allUsers = Array.from(users);
-            onlineUsers.textContent = `Đang online: ${allUsers.join(', ')}`;
-            onlineCount.textContent = `${allUsers.length} người online`;
+        function updateOnlineUsers(users) {
+            const userList = Object.keys(users || {});
+            const currentUsers = userList.filter(user => users[user].online);
+            
+            onlineUsers.textContent = `Đang online: ${currentUsers.join(', ')}`;
+            onlineCount.textContent = `${currentUsers.length} người online`;
         }
 
         // Hàm cập nhật trạng thái đang nhập
-        function updateTypingIndicator() {
-            const typingUsersList = Object.keys(typingUsers).filter(user => 
-                user !== currentUser && typingUsers[user] > Date.now() - 2000
+        function updateTypingIndicator(typingUsers) {
+            const typingUsersList = Object.keys(typingUsers || {}).filter(user => 
+                user !== currentUser && typingUsers[user] === true
             );
             
             if (typingUsersList.length > 0) {
@@ -427,96 +415,93 @@
             }
         }
 
+        // Hàm khởi tạo Firebase
+        function initializeFirebase() {
+            try {
+                firebase.initializeApp(firebaseConfig);
+                database = firebase.database();
+                connectionStatus.innerHTML = '<span class="connected">● Đã kết nối Firebase</span>';
+                return true;
+            } catch (error) {
+                connectionStatus.innerHTML = '<span class="disconnected">● Lỗi kết nối Firebase</span>';
+                console.error('Firebase initialization error:', error);
+                return false;
+            }
+        }
+
         // Hàm tham gia phòng chat
-        function joinChat() {
-            users.add(currentUser);
-            updateOnlineUsers();
-            
-            // Thông báo cho các tab khác
-            broadcastChannel.postMessage({
-                type: 'USER_JOINED',
-                user: currentUser,
-                tabId: currentTabId
+        function joinChatRoom() {
+            if (!database) {
+                alert('Lỗi kết nối database. Vui lòng thử lại.');
+                return;
+            }
+
+            // Thiết lập references
+            messagesRef = database.ref(`rooms/${currentRoom}/messages`);
+            usersRef = database.ref(`rooms/${currentRoom}/users`);
+            typingRef = database.ref(`rooms/${currentRoom}/typing`);
+            userRef = usersRef.child(currentUser);
+
+            // Đăng ký user online
+            userRef.set({
+                username: currentUser,
+                online: true,
+                lastSeen: firebase.database.ServerValue.TIMESTAMP
             });
+
+            // Lắng nghe tin nhắn mới
+            messagesRef.limitToLast(100).on('child_added', (snapshot) => {
+                const msg = snapshot.val();
+                addMessageElement(msg);
+            });
+
+            // Lắng nghe thay đổi danh sách user
+            usersRef.on('value', (snapshot) => {
+                updateOnlineUsers(snapshot.val());
+            });
+
+            // Lắng nghe trạng thái typing
+            typingRef.on('value', (snapshot) => {
+                updateTypingIndicator(snapshot.val());
+            });
+
+            // Thêm tin nhắn chào mừng
+            const welcomeMessage = {
+                content: `${currentUser} đã tham gia phòng chat!`,
+                sender: 'Hệ thống',
+                time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+                encrypted: ''
+            };
+            messagesRef.push(welcomeMessage);
         }
 
         // Hàm rời phòng chat
-        function leaveChat() {
-            users.delete(currentUser);
-            updateOnlineUsers();
-            
-            // Thông báo cho các tab khác
-            broadcastChannel.postMessage({
-                type: 'USER_LEFT',
-                user: currentUser,
-                tabId: currentTabId
-            });
-        }
-
-        // Xử lý tin nhắn từ các tab khác
-        broadcastChannel.onmessage = function(event) {
-            const data = event.data;
-            
-            switch (data.type) {
-                case 'MESSAGES_UPDATED':
-                    // Không cần làm gì vì chúng ta chỉ thêm tin nhắn mới
-                    break;
-                    
-                case 'NEW_MESSAGE':
-                    if (data.tabId !== currentTabId) {
-                        addMessage(data.content, data.sender, true, true);
-                    }
-                    break;
-                    
-                case 'USER_TYPING':
-                    if (data.tabId !== currentTabId && data.user !== currentUser) {
-                        typingUsers[data.user] = Date.now();
-                        updateTypingIndicator();
-                        
-                        // Tự động xóa sau 2 giây
-                        setTimeout(() => {
-                            if (typingUsers[data.user] < Date.now() - 2000) {
-                                delete typingUsers[data.user];
-                                updateTypingIndicator();
-                            }
-                        }, 2000);
-                    }
-                    break;
-                    
-                case 'USER_JOINED':
-                    if (data.tabId !== currentTabId) {
-                        users.add(data.user);
-                        updateOnlineUsers();
-                        addMessage(`${data.user} đã tham gia phòng chat`, "Hệ thống", false, true);
-                    }
-                    break;
-                    
-                case 'USER_LEFT':
-                    if (data.tabId !== currentTabId) {
-                        users.delete(data.user);
-                        updateOnlineUsers();
-                        addMessage(`${data.user} đã rời khỏi phòng chat`, "Hệ thống", false, true);
-                    }
-                    break;
+        function leaveChatRoom() {
+            if (userRef) {
+                userRef.update({ online: false });
             }
-        };
+            if (messagesRef) messagesRef.off();
+            if (usersRef) usersRef.off();
+            if (typingRef) typingRef.off();
+        }
 
         // Xử lý đăng nhập
         loginBtn.addEventListener('click', function() {
             const username = usernameInput.value.trim();
-            const password = passwordInput.value.trim();
+            const roomId = roomIdInput.value.trim();
             
-            if (username === '' || password === '') {
+            if (username === '' || roomId === '') {
                 alert('Vui lòng nhập đầy đủ thông tin!');
                 return;
             }
             
-            if (password !== defaultPassword) {
-                alert('Mật khẩu không chính xác!');
+            currentUser = username;
+            currentRoom = roomId;
+            
+            // Khởi tạo Firebase
+            if (!initializeFirebase()) {
                 return;
             }
-            
-            currentUser = username;
             
             // Ẩn form đăng nhập, hiện giao diện chat
             loginForm.style.display = 'none';
@@ -525,55 +510,52 @@
             // Hiển thị thông tin người dùng
             userDisplayName.textContent = username;
             userAvatar.textContent = username.charAt(0).toUpperCase();
-            tabIndicator.textContent = `Tab ${currentTabId.substr(0, 4)}`;
-            
-            // Tải tin nhắn
-            loadMessages();
+            roomDisplay.textContent = `Phòng: ${roomId}`;
             
             // Tham gia phòng chat
-            joinChat();
-            
-            // Thêm tin nhắn chào mừng
-            addMessage(`Chào mừng ${username} đã tham gia phòng chat!`, "Hệ thống", false);
+            joinChatRoom();
         });
 
         // Xử lý đăng xuất
         logoutBtn.addEventListener('click', function() {
-            // Rời phòng chat
-            leaveChat();
+            leaveChatRoom();
             
             chatContainer.style.display = 'none';
             loginForm.style.display = 'block';
             usernameInput.value = '';
-            passwordInput.value = '';
+            roomIdInput.value = '';
+            messagesContainer.innerHTML = '<div class="message received"><div>Chào mừng đến với phòng chat đa người dùng!</div><div class="message-info">Hệ thống • Vừa xong</div></div>';
             
             currentUser = null;
+            currentRoom = null;
         });
 
         // Hàm gửi tin nhắn
         function sendMessage() {
             const message = messageInput.value.trim();
             
-            if (message === '') {
+            if (message === '' || !messagesRef) {
                 return;
             }
             
-            addMessage(message, currentUser);
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
             
-            // Thông báo cho các tab khác
-            broadcastChannel.postMessage({
-                type: 'NEW_MESSAGE',
+            const newMessage = {
                 content: message,
+                encrypted: encryptMessage(message),
                 sender: currentUser,
-                tabId: currentTabId
-            });
+                time: timeString,
+                timestamp: now.getTime()
+            };
             
-            // Xóa nội dung ô nhập
+            messagesRef.push(newMessage);
             messageInput.value = '';
             
             // Xóa trạng thái đang nhập
-            delete typingUsers[currentUser];
-            updateTypingIndicator();
+            if (typingRef) {
+                typingRef.child(currentUser).set(false);
+            }
         }
 
         // Xử lý sự kiện gửi tin nhắn
@@ -586,43 +568,35 @@
         });
 
         // Xử lý sự kiện nhập tin nhắn (hiển thị "đang nhập...")
+        let typingTimeout = null;
         messageInput.addEventListener('input', function() {
-            // Cập nhật trạng thái đang nhập
-            typingUsers[currentUser] = Date.now();
-            updateTypingIndicator();
+            if (!typingRef) return;
             
-            // Thông báo cho các tab khác
-            broadcastChannel.postMessage({
-                type: 'USER_TYPING',
-                user: currentUser,
-                tabId: currentTabId
-            });
+            // Thông báo đang nhập
+            typingRef.child(currentUser).set(true);
             
             // Xóa timeout cũ
             if (typingTimeout) {
                 clearTimeout(typingTimeout);
             }
             
-            // Đặt timeout mới để xóa trạng thái sau 2 giây không nhập
+            // Tự động xóa sau 2 giây
             typingTimeout = setTimeout(() => {
-                delete typingUsers[currentUser];
-                updateTypingIndicator();
+                typingRef.child(currentUser).set(false);
             }, 2000);
-        });
-
-        // Tải dữ liệu ban đầu
-        window.addEventListener('load', function() {
-            loadMessages();
-            
-            // Thêm indicator để biết đang ở tab nào
-            tabIndicator.textContent = `Tab ${currentTabId.substr(0, 4)}`;
         });
 
         // Xử lý khi tab đóng
         window.addEventListener('beforeunload', function() {
             if (currentUser) {
-                leaveChat();
+                leaveChatRoom();
             }
+        });
+
+        // Thêm tin nhắn mẫu
+        window.addEventListener('load', function() {
+            // Thêm indicator để biết đang ở tab nào
+            roomDisplay.textContent = 'Phòng: ...';
         });
     </script>
 </body>
