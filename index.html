@@ -13,7 +13,7 @@
         }
         
         body {
-            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            background: #f5f5f5;
             height: 100vh;
             display: flex;
             justify-content: center;
@@ -24,10 +24,11 @@
         .container {
             width: 90%;
             max-width: 500px;
-            background-color: rgba(255, 255, 255, 0.95);
+            background-color: #ffffff;
             border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
             overflow: hidden;
+            border: 1px solid #e0e0e0;
         }
         
         .header {
@@ -69,6 +70,12 @@
             font-size: 1rem;
             font-weight: 600;
             cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
         
         .chat-container {
@@ -203,6 +210,19 @@
         .disconnected {
             color: #f44336;
         }
+        
+        .error-message {
+            color: #f44336;
+            font-size: 0.9rem;
+            margin-top: 10px;
+            text-align: center;
+            display: none;
+        }
+        
+        .user-count {
+            font-weight: bold;
+            color: #1a2a6c;
+        }
     </style>
     
     <!-- Firebase SDK -->
@@ -222,12 +242,13 @@
                 <input type="text" id="username" placeholder="Nhập tên hiển thị">
             </div>
             <div class="form-group">
-                <label for="roomId">ID Phòng chat</label>
-                <input type="text" id="roomId" placeholder="Nhập ID phòng (ví dụ: room1)">
+                <label for="password">Mật khẩu phòng chat</label>
+                <input type="password" id="password" placeholder="Nhập mật khẩu (mặc định: tsc)">
             </div>
             <button id="loginBtn">Vào Phòng Chat</button>
+            <div class="error-message" id="errorMessage"></div>
             <p style="text-align: center; margin-top: 15px; color: #666;">
-                Cùng ID phòng = Cùng phòng chat • Chia sẻ ID phòng cho bạn bè
+                Chỉ có một phòng chat duy nhất • Mật khẩu: tsc
             </p>
         </div>
         
@@ -239,7 +260,6 @@
                         <div id="userDisplayName">Người dùng</div>
                         <div style="font-size: 0.8rem;">
                             <span id="onlineCount">0 người online</span>
-                            <span id="roomDisplay">Phòng: ...</span>
                         </div>
                         <div class="connection-status" id="connectionStatus">
                             <span class="connected">● Đang kết nối</span>
@@ -276,10 +296,9 @@
         const loginBtn = document.getElementById('loginBtn');
         const logoutBtn = document.getElementById('logoutBtn');
         const usernameInput = document.getElementById('username');
-        const roomIdInput = document.getElementById('roomId');
+        const passwordInput = document.getElementById('password');
         const userDisplayName = document.getElementById('userDisplayName');
         const userAvatar = document.getElementById('userAvatar');
-        const roomDisplay = document.getElementById('roomDisplay');
         const messageInput = document.getElementById('messageInput');
         const sendBtn = document.getElementById('sendBtn');
         const messagesContainer = document.getElementById('messagesContainer');
@@ -287,25 +306,25 @@
         const onlineUsers = document.getElementById('onlineUsers');
         const onlineCount = document.getElementById('onlineCount');
         const connectionStatus = document.getElementById('connectionStatus');
+        const errorMessage = document.getElementById('errorMessage');
 
         // Biến toàn cục
         let currentUser = null;
-        let currentRoom = null;
         let database = null;
         let messagesRef = null;
         let usersRef = null;
         let typingRef = null;
         let userRef = null;
 
-        // Firebase configuration - THAY THẾ BẰNG CẤU HÌNH CỦA BẠN
+        // Firebase configuration - Sử dụng cấu hình của bạn
         const firebaseConfig = {
-            apiKey: "AIzaSyYOUR_API_KEY_HERE",
-            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-            databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_PROJECT_ID.appspot.com",
-            messagingSenderId: "YOUR_SENDER_ID",
-            appId: "YOUR_APP_ID"
+            apiKey: "AIzaSyCzp95LR6V-UOgkKAURP4sKfQAkcR-Wh1k",
+            authDomain: "chat-hash.firebaseapp.com",
+            databaseURL: "https://chat-hash-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "chat-hash",
+            storageBucket: "chat-hash.firebasestorage.app",
+            messagingSenderId: "168566865519",
+            appId: "1:168566865519:web:fe954985d8b4b2d532579a"
         };
 
         // Hàm mã hóa tin nhắn - thay thế mỗi ký tự bằng ký tự ngẫu nhiên
@@ -390,28 +409,42 @@
         // Hàm khởi tạo Firebase
         function initializeFirebase() {
             try {
-                firebase.initializeApp(firebaseConfig);
+                // Kiểm tra xem Firebase đã được khởi tạo chưa
+                if (!firebase.apps.length) {
+                    firebase.initializeApp(firebaseConfig);
+                }
                 database = firebase.database();
                 connectionStatus.innerHTML = '<span class="connected">● Đã kết nối Firebase</span>';
                 return true;
             } catch (error) {
                 connectionStatus.innerHTML = '<span class="disconnected">● Lỗi kết nối Firebase</span>';
                 console.error('Firebase initialization error:', error);
+                showError('Lỗi kết nối cơ sở dữ liệu. Vui lòng thử lại.');
                 return false;
             }
+        }
+
+        // Hàm hiển thị lỗi
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+            
+            setTimeout(() => {
+                errorMessage.style.display = 'none';
+            }, 5000);
         }
 
         // Hàm tham gia phòng chat
         function joinChatRoom() {
             if (!database) {
-                alert('Lỗi kết nối database. Vui lòng thử lại.');
+                showError('Lỗi kết nối database. Vui lòng thử lại.');
                 return;
             }
 
-            // Thiết lập references
-            messagesRef = database.ref(`rooms/${currentRoom}/messages`);
-            usersRef = database.ref(`rooms/${currentRoom}/users`);
-            typingRef = database.ref(`rooms/${currentRoom}/typing`);
+            // Thiết lập references - chỉ có một phòng duy nhất
+            messagesRef = database.ref('messages');
+            usersRef = database.ref('users');
+            typingRef = database.ref('typing');
             userRef = usersRef.child(currentUser);
 
             // Đăng ký user online
@@ -460,15 +493,19 @@
         // Xử lý đăng nhập
         loginBtn.addEventListener('click', function() {
             const username = usernameInput.value.trim();
-            const roomId = roomIdInput.value.trim();
+            const password = passwordInput.value.trim();
             
-            if (username === '' || roomId === '') {
-                alert('Vui lòng nhập đầy đủ thông tin!');
+            if (username === '' || password === '') {
+                showError('Vui lòng nhập đầy đủ thông tin!');
+                return;
+            }
+            
+            if (password !== 'tsc') {
+                showError('Mật khẩu không đúng! Mật khẩu mặc định là "tsc"');
                 return;
             }
             
             currentUser = username;
-            currentRoom = roomId;
             
             // Khởi tạo Firebase
             if (!initializeFirebase()) {
@@ -482,7 +519,6 @@
             // Hiển thị thông tin người dùng
             userDisplayName.textContent = username;
             userAvatar.textContent = username.charAt(0).toUpperCase();
-            roomDisplay.textContent = `Phòng: ${roomId}`;
             
             // Tham gia phòng chat
             joinChatRoom();
@@ -495,11 +531,10 @@
             chatContainer.style.display = 'none';
             loginForm.style.display = 'block';
             usernameInput.value = '';
-            roomIdInput.value = '';
+            passwordInput.value = '';
             messagesContainer.innerHTML = '<div class="message received"><div>Chào mừng đến với phòng chat đa người dùng!</div><div class="message-info">Hệ thống • Vừa xong</div></div>';
             
             currentUser = null;
-            currentRoom = null;
         });
 
         // Hàm gửi tin nhắn
@@ -568,7 +603,7 @@
         // Thêm tin nhắn mẫu
         window.addEventListener('load', function() {
             // Thêm indicator để biết đang ở tab nào
-            roomDisplay.textContent = 'Phòng: ...';
+            userDisplayName.textContent = 'Người dùng';
         });
     </script>
 </body>
